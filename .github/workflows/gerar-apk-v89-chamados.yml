@@ -1,0 +1,30 @@
+name: Gerar APK AUTO SOCORRO VALEN V8.9 CHAMADOS
+on:
+  workflow_dispatch:
+jobs:
+  gerar-apk:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Verificar arquivo correto
+        run: |
+          echo "273ce3096e8de36f83164e1ef97c1aeaf5b266d35e8843efea869ce286d3a1aa  AUTO_SOCORRO_VALEN_V8_9_CHAMADOS_GPS_CORRIGIDO.zip" | sha256sum -c -
+          mkdir projeto
+          unzip -oq AUTO_SOCORRO_VALEN_V8_9_CHAMADOS_GPS_CORRIGIDO.zip -d projeto
+          grep -q 'versionCode 89' projeto/app/build.gradle
+          grep -q ValenTrackingService projeto/app/src/main/AndroidManifest.xml
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compilar APK
+        working-directory: projeto
+        run: gradle assembleDebug --no-daemon
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AUTO-SOCORRO-VALEN-V8-9-CHAMADOS-APK
+          path: projeto/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
