@@ -1,9 +1,7 @@
 
-name: Gerar APK AUTO SOCORRO VALEN V8.3
+name: Gerar APK AUTO SOCORRO VALEN V8.6 - verificado
 
 on:
-  push:
-    branches: [main]
   workflow_dispatch:
 
 jobs:
@@ -13,15 +11,23 @@ jobs:
       contents: read
 
     steps:
-      - name: Baixar projeto
+      - name: Baixar arquivos
         uses: actions/checkout@v4
 
-      - name: Extrair V8.3
+      - name: Verificar ZIP V8.6
+        shell: bash
         run: |
+          set -euo pipefail
+          ARQUIVO="AUTO_SOCORRO_VALEN_V8_6_APK_CONFERIDO.zip"
+          test -f "$ARQUIVO"
+          echo "599e058a3834e8b5e9594e04f74a6069bb78746bd8c41eff17d10f52b251e445  $ARQUIVO" | sha256sum --check --status
           mkdir -p projeto
-          unzip -oq AUTO_SOCORRO_VALEN_V8_3_ESTRUTURA_REVISADA.zip -d projeto
+          unzip -oq "$ARQUIVO" -d projeto
           test -f projeto/app/build.gradle
-          test -f projeto/app/src/main/AndroidManifest.xml
+          test -f projeto/app/src/main/assets/index.html
+          grep -Eq 'versionCode[[:space:]]+86' projeto/app/build.gradle
+          grep -Fq "versionName '8.6.0-test'" projeto/app/build.gradle
+          grep -Fq 'VALEN-MOTORISTA-V8.6' projeto/app/src/main/assets/index.html
 
       - name: Configurar Java
         uses: actions/setup-java@v4
@@ -31,7 +37,6 @@ jobs:
 
       - name: Verificar Android SDK
         run: |
-          echo "ANDROID_HOME=$ANDROID_HOME"
           test -d "$ANDROID_HOME"
           ls "$ANDROID_HOME/platforms"
           ls "$ANDROID_HOME/build-tools"
@@ -41,14 +46,33 @@ jobs:
         with:
           gradle-version: '8.9'
 
-      - name: Compilar APK
+      - name: Compilar APK V8.6
         working-directory: projeto
         run: gradle assembleDebug --no-daemon --stacktrace
 
-      - name: Disponibilizar APK
+      - name: Conferir versao do APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="projeto/app/build/outputs/apk/debug/app-debug.apk"
+          test -f "$APK"
+          AAPT=$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)
+          test -n "$AAPT"
+          "$AAPT" dump badging "$APK" | tee projeto/versao-apk.txt
+          grep -F "versionCode='86' versionName='8.6.0-test'" projeto/versao-apk.txt
+          grep -F "package: name='br.com.valen.motorista'" projeto/versao-apk.txt
+          unzip -p "$APK" assets/index.html > projeto/asset-versao.html
+          grep -Fq 'VALEN-MOTORISTA-V8.6' projeto/asset-versao.html
+          rm -f projeto/asset-versao.html
+          sha256sum "$APK" | tee projeto/sha256-apk.txt
+
+      - name: Disponibilizar APK verificado
         uses: actions/upload-artifact@v4
         with:
-          name: AUTO-SOCORRO-VALEN-V8-3
-          path: projeto/app/build/outputs/apk/debug/*.apk
+          name: AUTO-SOCORRO-VALEN-V8-6-VERIFICADO
+          path: |
+            projeto/app/build/outputs/apk/debug/app-debug.apk
+            projeto/versao-apk.txt
+            projeto/sha256-apk.txt
           if-no-files-found: error
           
