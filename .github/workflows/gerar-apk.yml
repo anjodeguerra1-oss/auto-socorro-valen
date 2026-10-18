@@ -1,0 +1,50 @@
+
+name: Gerar APK AUTO SOCORRO VALEN V8.3
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  gerar-apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - name: Baixar arquivos
+        uses: actions/checkout@v4
+
+      - name: Extrair projeto V8.3
+        run: |
+          mkdir -p projeto
+          unzip -oq AUTO_SOCORRO_VALEN_V8_3_ESTRUTURA_REVISADA.zip -d projeto
+          find projeto -maxdepth 3 -type f | head -40
+          test -f projeto/app/build.gradle
+          test -f projeto/app/src/main/AndroidManifest.xml
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Android
+        uses: android-actions/setup-android@v3
+
+      - name: Configurar Gradle
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Gerar APK de teste
+        working-directory: projeto
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AUTO-SOCORRO-VALEN-V8-3
+          path: projeto/app/build/outputs/apk/debug/*.apk
+          if-no-files-found: error
