@@ -13,32 +13,35 @@ jobs:
       contents: read
 
     steps:
-      - name: Baixar arquivos
+      - name: Baixar projeto
         uses: actions/checkout@v4
 
-      - name: Extrair projeto V8.3
+      - name: Extrair V8.3
         run: |
           mkdir -p projeto
           unzip -oq AUTO_SOCORRO_VALEN_V8_3_ESTRUTURA_REVISADA.zip -d projeto
-          find projeto -maxdepth 3 -type f | head -40
           test -f projeto/app/build.gradle
           test -f projeto/app/src/main/AndroidManifest.xml
 
-      - name: Configurar Java 17
+      - name: Configurar Java
         uses: actions/setup-java@v4
         with:
           distribution: temurin
           java-version: '17'
 
-      - name: Configurar Android
-        uses: android-actions/setup-android@v3
+      - name: Verificar Android SDK
+        run: |
+          echo "ANDROID_HOME=$ANDROID_HOME"
+          test -d "$ANDROID_HOME"
+          ls "$ANDROID_HOME/platforms"
+          ls "$ANDROID_HOME/build-tools"
 
       - name: Configurar Gradle
         uses: gradle/actions/setup-gradle@v4
         with:
           gradle-version: '8.9'
 
-      - name: Gerar APK de teste
+      - name: Compilar APK
         working-directory: projeto
         run: gradle assembleDebug --no-daemon --stacktrace
 
@@ -48,3 +51,4 @@ jobs:
           name: AUTO-SOCORRO-VALEN-V8-3
           path: projeto/app/build/outputs/apk/debug/*.apk
           if-no-files-found: error
+          
