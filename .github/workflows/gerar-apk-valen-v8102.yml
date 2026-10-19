@@ -1,0 +1,82 @@
+name: Gerar APK AUTO SOCORRO VALEN V8.10.2
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/gerar-apk-valen-v8102.yml'
+      - 'AUTO_SOCORRO_VALEN_V8_10_2_BOTOES_ACEITAR_RECUSAR_FONTE.zip'
+jobs:
+  compilar:
+    name: Compilar e verificar V8.10.2
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Baixar repositório
+        uses: actions/checkout@v4
+
+      - name: Validar ZIP corrigido e extrair projeto
+        shell: bash
+        run: |
+          set -euo pipefail
+          ZIP="AUTO_SOCORRO_VALEN_V8_10_2_BOTOES_ACEITAR_RECUSAR_FONTE.zip"
+          echo "43706beee7aef46d1254f5108f43094dab937ccfa420838d5e14ad84f0de351f  $ZIP" | sha256sum -c -
+          mkdir -p projeto
+          unzip -oq "$ZIP" -d projeto
+          test -s projeto/app/src/main/assets/index.html
+          test -f projeto/app/src/main/java/br/com/valen/motorista/ValenTrackingService.java
+          test -f projeto/app/src/main/java/br/com/valen/motorista/ValenSecureStore.java
+          test -f projeto/app/src/main/AndroidManifest.xml
+          grep -Eq 'versionCode[[:space:]]+92' projeto/app/build.gradle
+          grep -Fq "versionName '8.10.2-test'" projeto/app/build.gradle
+          grep -Fq 'valen_responder_despacho_teste' projeto/app/src/main/assets/index.html
+
+      - name: Verificar GPS e código nativo preservados
+        shell: bash
+        run: |
+          set -euo pipefail
+          BASE="AUTO_SOCORRO_VALEN_V8_10_COMPLETO_COM_GERADOR_APK.zip"
+          test -f "$BASE"
+          for arq in ValenTrackingService.java ValenSecureStore.java MainActivity.java; do
+            cmp <(unzip -p "$BASE" "app/src/main/java/br/com/valen/motorista/$arq") "projeto/app/src/main/java/br/com/valen/motorista/$arq"
+          done
+          cmp <(unzip -p "$BASE" app/src/main/AndroidManifest.xml) projeto/app/src/main/AndroidManifest.xml
+          echo "GPS e código nativo conferidos."
+
+      - name: Configurar Java 17
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - name: Configurar Gradle 8.9
+        uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+
+      - name: Compilar APK
+        working-directory: projeto
+        run: gradle assembleDebug --no-daemon --stacktrace
+
+      - name: Validar APK e versão
+        shell: bash
+        run: |
+          set -euo pipefail
+          APK="projeto/app/build/outputs/apk/debug/app-debug.apk"
+          test -s "$APK"
+          AAPT="$(find "$ANDROID_HOME/build-tools" -type f -name aapt | sort -V | tail -1)"
+          "$AAPT" dump badging "$APK" | tee projeto/versao-apk.txt
+          grep -F "package: name='br.com.valen.motorista'" projeto/versao-apk.txt
+          grep -F "versionCode='92'" projeto/versao-apk.txt
+          sha256sum "$APK" | tee projeto/sha256-apk.txt
+
+      - name: Disponibilizar APK
+        uses: actions/upload-artifact@v4
+        with:
+          name: AUTO-SOCORRO-VALEN-V8-10-2-APK-TESTE
+          path: |
+            projeto/app/build/outputs/apk/debug/app-debug.apk
+            projeto/versao-apk.txt
+            projeto/sha256-apk.txt
+          if-no-files-found: error
