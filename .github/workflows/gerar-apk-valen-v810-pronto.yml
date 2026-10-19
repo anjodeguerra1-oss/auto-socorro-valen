@@ -1,0 +1,36 @@
+name: Gerar APK VALEN V8.10 GPS e Chamados
+on:
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - name: Extrair e validar projeto V8.10
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "47cf247ce657f5413e5c42a5ece1ed1827331caa24f4f247160bc25888d8cae2  AUTO_SOCORRO_VALEN_V8_10_COMPLETO_COM_GERADOR_APK.zip" | sha256sum -c -
+          mkdir projeto
+          unzip -oq AUTO_SOCORRO_VALEN_V8_10_COMPLETO_COM_GERADOR_APK.zip -d projeto
+          test -f projeto/app/src/main/java/br/com/valen/motorista/ValenTrackingService.java
+          grep -Eq 'versionCode[[:space:]]+90' projeto/app/build.gradle
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.9'
+      - name: Compilar APK Android
+        working-directory: projeto
+        run: gradle assembleDebug --no-daemon --stacktrace
+      - name: Validar APK
+        run: test -s projeto/app/build/outputs/apk/debug/app-debug.apk
+      - uses: actions/upload-artifact@v4
+        with:
+          name: AUTO-SOCORRO-VALEN-V8-10-APK
+          path: projeto/app/build/outputs/apk/debug/app-debug.apk
+          if-no-files-found: error
